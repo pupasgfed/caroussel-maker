@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Image as ImageIcon, Trash2, Layers, FileImage, AlertTriangle } from 'lucide-react';
+import { Download, Image as ImageIcon, Trash2, Layers, FileImage, AlertTriangle, UploadCloud, Link2, Copy, Check } from 'lucide-react';
 import {
   DEFAULT_BACKGROUND,
   FORMATS,
@@ -12,6 +12,7 @@ import {
 } from './types';
 import { parseMarkdown, slugify } from './lib/parser';
 import { loadImage, renderSlide } from './lib/render';
+import { uploadToImgur, type ImgurPrivacy } from './lib/imgur';
 
 const SAMPLE_MARKDOWN = `# Ton esprit sait déjà
 Le corps suit toujours ce que l'esprit répète.
@@ -33,6 +34,13 @@ export default function CarrouselMaker() {
   const [fontsReady, setFontsReady] = useState(false);
   const [imageCache, setImageCache] = useState<Map<string, HTMLImageElement | null>>(new Map());
   const [isExporting, setIsExporting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [uploadedLinks, setUploadedLinks] = useState<string[]>([]);
+  const [imgurApiKey, setImgurApiKey] = useState(() => localStorage.getItem('imgur_api_key') ?? '');
+  const [imgurNameOverride, setImgurNameOverride] = useState(() => localStorage.getItem('imgur_name_override') ?? '');
+  const [imgurPrivacy, setImgurPrivacy] = useState<ImgurPrivacy>(() => (localStorage.getItem('imgur_privacy') as ImgurPrivacy) ?? 'public');
+  const [copied, setCopied] = useState(false);
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
 
   // Debounce markdown parsing (~300ms).
@@ -202,6 +210,11 @@ export default function CarrouselMaker() {
     [exportFormat],
   );
 
+  // Persist Imgur settings to localStorage
+  useEffect(() => { localStorage.setItem('imgur_api_key', imgurApiKey); }, [imgurApiKey]);
+  useEffect(() => { localStorage.setItem('imgur_name_override', imgurNameOverride); }, [imgurNameOverride]);
+  useEffect(() => { localStorage.setItem('imgur_privacy', imgurPrivacy); }, [imgurPrivacy]);
+
   const handleExportAll = async () => {
     if (slides.length === 0 || isExporting) return;
     setIsExporting(true);
@@ -213,6 +226,45 @@ export default function CarrouselMaker() {
       if (i < slides.length - 1) await delay(300);
     }
     setIsExporting(false);
+  };
+
+  const handleUploadToImgur = async () => {
+    if (slides.length === 0 || isUploading || !imgurApiKey.trim()) return;
+    setIsUploading(true);
+    setUploadedLinks([]);
+    setCopied(false);
+    const baseName = imgurNameOverride.trim() || slugify(slides[0].title || 'carrousel');
+    const links: string[] = [];
+    const mime = exportFormat === 'webp' ? 'image/webp' : 'image/jpeg';
+
+    for (let i = 0; i < slides.length; i++) {
+      setUploadProgress(`Upload ${i + 1}/${slides.length}…`);
+      const canvas = canvasRefs.current.get(i);
+      if (!canvas) continue;
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, mime, 0.92),
+      );
+      if (!blob) continue;
+      const num = String(i + 1).padStart(2, '0');
+      try {
+        const result = await uploadToImgur(blob, imgurApiKey.trim(), `${baseName}-${num}`, imgurPrivacy);
+        links.push(result.link);
+        setUploadedLinks([...links]);
+      } catch (err) {
+        setUploadProgress(`Erreur slide ${i + 1}: ${err instanceof Error ? err.message : 'échec'}`);
+        break;
+      }
+      if (i < slides.length - 1) await delay(300);
+    }
+
+    setUploadProgress(links.length > 0 ? `${links.length} image(s) uploadée(s)` : 'Échec');
+    setIsUploading(false);
+  };
+
+  const handleCopyAll = () => {
+    navigator.clipboard.writeText(uploadedLinks.join('\n'));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const dims = FORMATS[format];
@@ -246,7 +298,23 @@ export default function CarrouselMaker() {
           onTemplateChange={handleTemplateChange}
         />
       </div>
-      <ExportBar slidesCount={slides.length} onExport={handleExportAll} isExporting={isExporting} />
+      <ExportBar
+        slidesCount={slides.length}
+        onExport={handleExportAll}
+        isExporting={isExporting}
+        onUpload={handleUploadToImgur}
+        isUploading={isUploading}
+        uploadProgress={uploadProgress}
+        uploadedLinks={uploadedLinks}
+        imgurApiKey={imgurApiKey}
+        onApiKeyChange={setImgurApiKey}
+        imgurNameOverride={imgurNameOverride}
+        onNameOverrideChange={setImgurNameOverride}
+        imgurPrivacy={imgurPrivacy}
+        onPrivacyChange={setImgurPrivacy}
+        onCopyAll={handleCopyAll}
+        copied={copied}
+      />
     </div>
   );
 }
@@ -543,20 +611,111 @@ interface ExportBarProps {
   slidesCount: number;
   onExport: () => void;
   isExporting: boolean;
+  onUpload: () => void;
+  isUploading: boolean;
+  uploadProgress: string;
+  uploadedLinks: string[];
+  imgurApiKey: string;
+  onApiKeyChange: (v: string) => void;
+  imgurNameOverride: string;
+  onNameOverrideChange: (v: string) => void;
+  imgurPrivacy: ImgurPrivacy;
+  onPrivacyChange: (v: ImgurPrivacy) => void;
+  onCopyAll: () => void;
+  copied: boolean;
 }
 
 function ExportBar(props: ExportBarProps) {
-  const disabled = props.slidesCount === 0 || props.isExporting;
+  const exportDisabled = props.slidesCount === 0 || props.isExporting || props.isUploading;
+  const uploadDisabled = props.slidesCount === 0 || props.isUploading || props.isExporting || !props.imgurApiKey.trim();
+
   return (
-    <div className="w-full flex justify-center pt-2">
-      <button
-        onClick={props.onExport}
-        disabled={disabled}
-        className="flex items-center gap-2.5 bg-app-accent text-app-base font-spartan font-bold text-base px-8 py-4 rounded-12 shadow-lg hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
-      >
-        <Download size={20} strokeWidth={2.5} />
-        {props.isExporting ? 'Export en cours…' : `Exporter tout (${props.slidesCount} slide${props.slidesCount > 1 ? 's' : ''})`}
-      </button>
+    <div className="w-full flex flex-col items-center gap-4 pt-2">
+      <div className="w-full flex flex-col lg:flex-row items-stretch lg:items-end gap-3 justify-center">
+        {/* Download all button */}
+        <button
+          onClick={props.onExport}
+          disabled={exportDisabled}
+          className="flex items-center gap-2.5 bg-app-accent text-app-base font-spartan font-bold text-base px-8 py-4 rounded-12 shadow-lg hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+        >
+          <Download size={20} strokeWidth={2.5} />
+          {props.isExporting ? 'Export en cours…' : `Exporter tout (${props.slidesCount} slide${props.slidesCount > 1 ? 's' : ''})`}
+        </button>
+
+        {/* Divider */}
+        <div className="hidden lg:block w-px self-stretch bg-white/10" />
+
+        {/* Imgur upload controls */}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch gap-2">
+            <input
+              type="text"
+              value={props.imgurApiKey}
+              onChange={(e) => props.onApiKeyChange(e.target.value)}
+              placeholder="Client-ID…"
+              spellCheck={false}
+              className="bg-app-base/60 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-app-accent/60 w-full sm:w-48"
+            />
+            <input
+              type="text"
+              value={props.imgurNameOverride}
+              onChange={(e) => props.onNameOverrideChange(e.target.value)}
+              placeholder="Nom (défaut: titre)"
+              spellCheck={false}
+              className="bg-app-base/60 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-app-accent/60 w-full sm:w-40"
+            />
+            <select
+              value={props.imgurPrivacy}
+              onChange={(e) => props.onPrivacyChange(e.target.value as ImgurPrivacy)}
+              className="bg-app-base/60 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-app-accent/60 cursor-pointer"
+            >
+              <option value="public">Public</option>
+              <option value="hidden">Hidden</option>
+            </select>
+          </div>
+          <button
+            onClick={props.onUpload}
+            disabled={uploadDisabled}
+            className="flex items-center justify-center gap-2.5 bg-white/10 hover:bg-white/15 text-white font-spartan font-bold text-base px-6 py-3.5 rounded-12 border border-white/15 shadow-lg active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <UploadCloud size={20} strokeWidth={2.5} />
+            {props.isUploading ? props.uploadProgress : 'Upload to Imgur'}
+          </button>
+        </div>
+      </div>
+
+      {/* Uploaded links */}
+      {props.uploadedLinks.length > 0 && (
+        <div className="w-full max-w-2xl bg-app-panel rounded-12 p-4 shadow-lg">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white/80">
+              <Link2 size={16} />
+              {props.uploadedLinks.length} lien{props.uploadedLinks.length > 1 ? 's' : ''} Imgur
+            </div>
+            <button
+              onClick={props.onCopyAll}
+              className="flex items-center gap-1.5 text-xs text-white/70 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 transition-colors"
+            >
+              {props.copied ? <Check size={14} /> : <Copy size={14} />}
+              {props.copied ? 'Copié !' : 'Tout copier'}
+            </button>
+          </div>
+          <ul className="flex flex-col gap-1.5">
+            {props.uploadedLinks.map((link, i) => (
+              <li key={i}>
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-app-accent hover:underline break-all"
+                >
+                  {link}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
