@@ -10,6 +10,7 @@ const COLOR_TITLE_OUTLINE = '#161616';
 const COLOR_DARK = '#323347';
 const COLOR_WHITE = '#ffffff';
 const COLOR_ACCENT = '#aaa8f8';
+const YELLOW_HIGHLIGHT = '#FFE234';
 
 const SIZE_TITLE = 98;
 const SIZE_BODY = 68;
@@ -120,9 +121,9 @@ function drawBackground(
 
   if (background.type === 'image' && bgImage) {
     drawImageCover(ctx, bgImage, width, height);
-    const needsOverlay = template === 'outline' || template === 'underlay' || template === 'minimal';
+    const needsOverlay = template === 'outline' || template === 'underlay' || template === 'minimal' || template === 'fiche' || template === 'liste';
     if (needsOverlay) {
-      const overlayAlpha = template === 'minimal' ? 0.4 : 0.25;
+      const overlayAlpha = template === 'minimal' ? 0.4 : (template === 'fiche' || template === 'liste') ? 0.15 : 0.25;
       ctx.fillStyle = `rgba(0,0,0,${overlayAlpha})`;
       ctx.fillRect(0, 0, width, height);
     }
@@ -192,9 +193,9 @@ function measureLayout(
 }
 
 function getWrapWidths(template: TemplateId, contentWidth: number): { title: number; body: number; accent: number } {
-  const titlePadding: Record<string, number> = { collage: 64, bulles: 72, cartes: 56 };
-  const bodyPadding: Record<string, number> = { collage: 64, bulles: 64, cartes: 56 };
-  const accentPadding: Record<string, number> = { collage: 56, bulles: 56, cartes: 56 };
+  const titlePadding: Record<string, number> = { collage: 64, bulles: 72, cartes: 56, fiche: 64, liste: 56 };
+  const bodyPadding: Record<string, number> = { collage: 64, bulles: 64, cartes: 56, fiche: 56, liste: 56 };
+  const accentPadding: Record<string, number> = { collage: 56, bulles: 56, cartes: 56, fiche: 48 };
   return {
     title: Math.max(80, contentWidth - (titlePadding[template] ?? 0)),
     body: Math.max(80, contentWidth - (bodyPadding[template] ?? 0)),
@@ -252,6 +253,10 @@ function drawTitle(
     drawBullesTitle(ctx, block, x, y, size, centered, maxWidth);
   } else if (template === 'cartes') {
     drawCartesTitle(ctx, block, x, y, size, centered, maxWidth);
+  } else if (template === 'fiche') {
+    drawFicheTitle(ctx, block, x, y, size, centered, maxWidth);
+  } else if (template === 'liste') {
+    drawListeTitle(ctx, block, x, y, size, centered, maxWidth);
   } else {
     drawMinimalTitle(ctx, block, x, y, size, centered, maxWidth);
   }
@@ -409,6 +414,14 @@ function drawBody(
     drawCartesBody(ctx, text, size, x, y, maxWidth);
     return;
   }
+  if (template === 'fiche') {
+    drawFicheBody(ctx, text, size, x, y, maxWidth);
+    return;
+  }
+  if (template === 'liste') {
+    drawListeBody(ctx, text, size, x, y, maxWidth);
+    return;
+  }
   const weight = template === 'minimal' ? '400' : '700';
   ctx.font = `${weight} ${size}px ${FONT_FAMILY_BODY}`;
   ctx.textBaseline = 'top';
@@ -460,6 +473,10 @@ function drawAccent(
     drawBullesAccent(ctx, block, x, y, size, centered, maxWidth);
   } else if (template === 'cartes') {
     drawCartesAccent(ctx, block, x, y, size, centered, maxWidth);
+  } else if (template === 'fiche') {
+    drawFicheAccent(ctx, block, x, y, size, centered, maxWidth);
+  } else if (template === 'liste') {
+    drawListeAccent(ctx, block, x, y, size, centered, maxWidth);
   } else {
     drawStrokedAccent(ctx, block, x, y, size, centered, maxWidth);
   }
@@ -862,6 +879,200 @@ function drawCartesAccent(
   ctx.restore();
 }
 
+// ============ FICHE FOND ============
+
+/**
+ * Template « Fiche fond » : carte blanche à bords arrondis avec bordure accent gauche.
+ * Corps dans une carte semi-transparente. Accent en pastille couleur accent.
+ */
+function drawFicheTitle(
+  ctx: CanvasRenderingContext2D,
+  block: TextBlock,
+  x: number,
+  y: number,
+  size: number,
+  _centered: boolean,
+  maxWidth: number,
+) {
+  const paddingX = 28;
+  const paddingY = 20;
+  const radius = 14;
+  const lineHeight = size * LINE_HEIGHT_TITLE;
+  const cardH = block.totalHeight + paddingY * 2;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.25)';
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetY = 6;
+  ctx.fillStyle = COLOR_WHITE;
+  roundRect(ctx, x, y - paddingY, maxWidth, cardH, radius);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = COLOR_ACCENT;
+  roundRect(ctx, x, y - paddingY, 8, cardH, 4);
+  ctx.fill();
+
+  ctx.fillStyle = COLOR_DARK;
+  block.lines.forEach((line, i) => {
+    ctx.fillText(line.text, x + paddingX + 8, y + i * lineHeight);
+  });
+}
+
+function drawFicheBody(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  size: number,
+  x: number,
+  y: number,
+  maxWidth: number,
+) {
+  ctx.font = `700 ${size}px ${FONT_FAMILY_BODY}`;
+  ctx.textBaseline = 'top';
+  const block = wrapText(ctx, text, getWrapWidths('fiche', maxWidth).body, size * LINE_HEIGHT_BODY);
+  const paddingX = 28;
+  const paddingY = 18;
+  const radius = 14;
+  const cardH = block.totalHeight + paddingY * 2;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.18)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 4;
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  roundRect(ctx, x, y - paddingY, maxWidth, cardH, radius);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = COLOR_DARK;
+  block.lines.forEach((line, i) => {
+    ctx.fillText(line.text, x + paddingX, y + i * size * LINE_HEIGHT_BODY);
+  });
+}
+
+function drawFicheAccent(
+  ctx: CanvasRenderingContext2D,
+  block: TextBlock,
+  x: number,
+  y: number,
+  size: number,
+  _centered: boolean,
+  maxWidth: number,
+) {
+  const lineHeight = size * LINE_HEIGHT_ACCENT;
+  const paddingX = 24;
+  const paddingY = 10;
+  const radius = 10;
+  const pillW = Math.min(block.maxWidth + paddingX * 2, maxWidth);
+  const pillH = block.totalHeight + paddingY * 2;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.2)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = COLOR_ACCENT;
+  roundRect(ctx, x, y - paddingY, pillW, pillH, radius);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = COLOR_DARK;
+  block.lines.forEach((line, i) => {
+    ctx.fillText(line.text, x + paddingX, y + i * lineHeight);
+  });
+}
+
+// ============ LISTE STRUCTURÉE ============
+
+/**
+ * Template « Liste structurée » : titre en surlignage jaune dans une carte blanche,
+ * corps en texte régulier dans une carte blanche, accent stroked.
+ */
+function drawListeTitle(
+  ctx: CanvasRenderingContext2D,
+  block: TextBlock,
+  x: number,
+  y: number,
+  size: number,
+  _centered: boolean,
+  maxWidth: number,
+) {
+  const paddingX = 28;
+  const paddingY = 20;
+  const radius = 14;
+  const lineHeight = size * LINE_HEIGHT_TITLE;
+  const cardH = block.totalHeight + paddingY * 2;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.25)';
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetY = 6;
+  ctx.fillStyle = COLOR_WHITE;
+  roundRect(ctx, x, y - paddingY, maxWidth, cardH, radius);
+  ctx.fill();
+  ctx.restore();
+
+  const hPadX = 6;
+  const hPadY = 5;
+  block.lines.forEach((line, i) => {
+    const lineY = y + i * lineHeight;
+    ctx.fillStyle = YELLOW_HIGHLIGHT;
+    ctx.fillRect(
+      x + paddingX - hPadX,
+      lineY - hPadY,
+      line.width + hPadX * 2,
+      size * LINE_HEIGHT_TITLE + hPadY * 2,
+    );
+  });
+
+  ctx.fillStyle = COLOR_TITLE_OUTLINE;
+  block.lines.forEach((line, i) => {
+    ctx.fillText(line.text, x + paddingX, y + i * lineHeight);
+  });
+}
+
+function drawListeBody(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  size: number,
+  x: number,
+  y: number,
+  maxWidth: number,
+) {
+  ctx.font = `400 ${size}px ${FONT_FAMILY_BODY}`;
+  ctx.textBaseline = 'top';
+  const block = wrapText(ctx, text, getWrapWidths('liste', maxWidth).body, size * LINE_HEIGHT_BODY);
+  const paddingX = 28;
+  const paddingY = 18;
+  const radius = 14;
+  const cardH = block.totalHeight + paddingY * 2;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.18)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 4;
+  ctx.fillStyle = COLOR_WHITE;
+  roundRect(ctx, x, y - paddingY, maxWidth, cardH, radius);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = COLOR_DARK;
+  block.lines.forEach((line, i) => {
+    ctx.fillText(line.text, x + paddingX, y + i * size * LINE_HEIGHT_BODY);
+  });
+}
+
+function drawListeAccent(
+  ctx: CanvasRenderingContext2D,
+  block: TextBlock,
+  x: number,
+  y: number,
+  size: number,
+  centered: boolean,
+  maxWidth: number,
+) {
+  drawStrokedAccent(ctx, block, x, y, size, centered, maxWidth);
+}
+
 // ============ PADDING HELPER ============
 
 function getBlockPadding(template: TemplateId): { title: number; body: number; accent: number } {
@@ -872,6 +1083,10 @@ function getBlockPadding(template: TemplateId): { title: number; body: number; a
       return { title: 48, body: 40, accent: 28 };
     case 'cartes':
       return { title: 40, body: 36, accent: 28 };
+    case 'fiche':
+      return { title: 40, body: 36, accent: 20 };
+    case 'liste':
+      return { title: 40, body: 36, accent: 0 };
     default:
       return { title: 0, body: 0, accent: 0 };
   }

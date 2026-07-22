@@ -1,6 +1,6 @@
 export type SlideFormat = 'carrousel' | 'story';
 export type ExportFormat = 'jpg' | 'webp';
-export type TemplateId = 'outline' | 'underlay' | 'minimal' | 'collage' | 'bulles' | 'cartes';
+export type TemplateId = 'outline' | 'underlay' | 'minimal' | 'collage' | 'bulles' | 'cartes' | 'fiche' | 'liste';
 
 export interface ParsedSlide {
   title: string;
@@ -47,4 +47,6 @@ export const TEMPLATE_LABELS: Record<TemplateId, string> = {
   collage: 'Collage rotatif',
   bulles: 'Bulles story',
   cartes: 'Cartes empilées',
+  fiche: 'Fiche fond',
+  liste: 'Liste structurée',
 };
