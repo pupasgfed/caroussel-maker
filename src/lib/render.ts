@@ -67,7 +67,11 @@ export function renderSlide(
 
   drawBackground(ctx, background, template, dims, bgImage);
 
-  let config: RenderConfig = { titleSize: SIZE_TITLE, bodySize: SIZE_BODY, accentSize: SIZE_ACCENT };
+  let config: RenderConfig = {
+    titleSize: SIZE_TITLE,
+    bodySize: template === 'liste' ? 52 : SIZE_BODY,
+    accentSize: SIZE_ACCENT,
+  };
 
   for (let i = 0; i < MAX_SHRINK_ITERATIONS; i++) {
     const { titleBlock, bodyBlock, accentBlock, layout } = measureLayout(
@@ -194,7 +198,7 @@ function measureLayout(
 
 function getWrapWidths(template: TemplateId, contentWidth: number): { title: number; body: number; accent: number } {
   const titlePadding: Record<string, number> = { collage: 64, bulles: 72, cartes: 56, fiche: 64, liste: 56 };
-  const bodyPadding: Record<string, number> = { collage: 64, bulles: 64, cartes: 56, fiche: 56, liste: 56 };
+  const bodyPadding: Record<string, number> = { collage: 64, bulles: 64, cartes: 56, fiche: 56, liste: 32 };
   const accentPadding: Record<string, number> = { collage: 56, bulles: 56, cartes: 56, fiche: 48 };
   return {
     title: Math.max(80, contentWidth - (titlePadding[template] ?? 0)),
@@ -1041,8 +1045,8 @@ function drawListeBody(
   ctx.font = `400 ${size}px ${FONT_FAMILY_BODY}`;
   ctx.textBaseline = 'top';
   const block = wrapText(ctx, text, getWrapWidths('liste', maxWidth).body, size * LINE_HEIGHT_BODY);
-  const paddingX = 28;
-  const paddingY = 18;
+  const paddingX = 18;
+  const paddingY = 12;
   const radius = 14;
   const cardH = block.totalHeight + paddingY * 2;
 
@@ -1086,7 +1090,7 @@ function getBlockPadding(template: TemplateId): { title: number; body: number; a
     case 'fiche':
       return { title: 40, body: 36, accent: 20 };
     case 'liste':
-      return { title: 40, body: 36, accent: 0 };
+      return { title: 40, body: 24, accent: 0 };
     default:
       return { title: 0, body: 0, accent: 0 };
   }
