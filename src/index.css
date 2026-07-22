@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #323347;
+  color: #ffffff;
+  /* Nunito Sans substitue "SN Pro" (indisponible sur Google Fonts) dans l'interface */
+  font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbars discrètes pour le thème sombre */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #6b6c87 transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: #6b6c87;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #7e7f9c;
+  background-clip: content-box;
+}
+
+/* Le canvas de prévisualisation garde son ratio via width:100%; height:auto */
+canvas.carousel-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+/* Range color input: taille cohérente */
+input[type='color'] {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+input[type='color']::-webkit-color-swatch {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+}
+input[type='color']::-moz-color-swatch {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+}
