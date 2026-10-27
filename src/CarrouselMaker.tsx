@@ -22,7 +22,13 @@ Le corps suit toujours ce que l'esprit répète.
 Deuxième slide, corps de texte.
 > Autre accent.`;
 
-const FONT_NAMES = ['"League Spartan"', '"Nunito Sans"', '"Madimi One"'];
+const FONT_OPTIONS = [
+  { value: '"League Spartan"', label: 'League Spartan' },
+  { value: '"Nunito Sans"', label: 'Nunito Sans' },
+  { value: '"Madimi One"', label: 'Madimi One' },
+];
+const DEFAULT_TITLE_FONT = FONT_OPTIONS[0].value;
+const DEFAULT_TITLE_COLOR = '#161616';
 
 export default function CarrouselMaker() {
   const [format, setFormat] = useState<SlideFormat>('carrousel');
@@ -31,6 +37,8 @@ export default function CarrouselMaker() {
   const [debouncedMarkdown, setDebouncedMarkdown] = useState(SAMPLE_MARKDOWN);
   const [backgrounds, setBackgrounds] = useState<Background[]>([]);
   const [templates, setTemplates] = useState<TemplateId[]>([]);
+  const [titleFont, setTitleFont] = useState(DEFAULT_TITLE_FONT);
+  const [titleColor, setTitleColor] = useState(DEFAULT_TITLE_COLOR);
   const [fontsReady, setFontsReady] = useState(false);
   const [imageCache, setImageCache] = useState<Map<string, HTMLImageElement | null>>(new Map());
   const [isExporting, setIsExporting] = useState(false);
@@ -77,7 +85,7 @@ export default function CarrouselMaker() {
     let cancelled = false;
     (async () => {
       try {
-        await Promise.all(FONT_NAMES.map((f) => document.fonts.load(`16px ${f}`)));
+        await Promise.all(FONT_OPTIONS.map(({ value }) => document.fonts.load(`16px ${value}`)));
         await document.fonts.ready;
       } catch {
         // ignore — canvas will use fallback fonts
@@ -124,9 +132,9 @@ export default function CarrouselMaker() {
       const bg = backgrounds[i] || DEFAULT_BACKGROUND;
       const tpl = templates[i] || 'outline';
       const bgImg = bg.type === 'image' && bg.image ? imageCache.get(bg.image) || null : null;
-      renderSlide(ctx, slide, bg, tpl, dims, bgImg);
+      renderSlide(ctx, slide, bg, tpl, dims, bgImg, { titleFont, titleColor });
     });
-  }, [slides, backgrounds, templates, format, fontsReady, imageCache]);
+  }, [slides, backgrounds, templates, format, fontsReady, imageCache, titleFont, titleColor]);
 
   const handleBackgroundChange = (index: number, patch: Partial<Background>) => {
     setBackgrounds((prev) => {
@@ -284,6 +292,10 @@ export default function CarrouselMaker() {
           onFormatChange={setFormat}
           onExportFormatChange={setExportFormat}
           onMarkdownChange={setRawMarkdown}
+          titleFont={titleFont}
+          titleColor={titleColor}
+          onTitleFontChange={setTitleFont}
+          onTitleColorChange={setTitleColor}
         />
         <PreviewPanel
           slides={slides}
@@ -347,6 +359,10 @@ interface ControlPanelProps {
   onFormatChange: (f: SlideFormat) => void;
   onExportFormatChange: (f: ExportFormat) => void;
   onMarkdownChange: (s: string) => void;
+  titleFont: string;
+  titleColor: string;
+  onTitleFontChange: (font: string) => void;
+  onTitleColorChange: (color: string) => void;
 }
 
 function ControlPanel(props: ControlPanelProps) {
@@ -367,6 +383,34 @@ function ControlPanel(props: ControlPanelProps) {
               <option value="jpg">.jpg</option>
               <option value="webp">.webp</option>
             </Select>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <Field label="Police du titre (#)">
+            <Select value={props.titleFont} onChange={props.onTitleFontChange}>
+              {FONT_OPTIONS.map((font) => (
+                <option key={font.value} value={font.value}>{font.label}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Couleur du titre (#)">
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={props.titleColor}
+                onChange={(e) => props.onTitleColorChange(e.target.value)}
+                className="w-10 h-10 rounded-lg flex-shrink-0"
+                title="Couleur du titre"
+              />
+              <input
+                type="text"
+                value={props.titleColor}
+                onChange={(e) => props.onTitleColorChange(e.target.value)}
+                className="min-w-0 w-full bg-app-base/60 border border-white/10 rounded-lg px-2.5 py-2 text-xs font-mono text-white focus:outline-none focus:ring-2 focus:ring-app-accent/60"
+                maxLength={7}
+                aria-label="Code couleur du titre"
+              />
+            </div>
           </Field>
         </div>
         <p className="text-xs text-white/45 mt-3 italic">Le template se choisit slide par slide, sous chaque image.</p>

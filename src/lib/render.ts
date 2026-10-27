@@ -1,12 +1,10 @@
 import type { Background, CanvasDimensions, ParsedSlide, TemplateId } from '../types';
 import { computeLayout, wrapText, type TextBlock } from './layout';
 
-const FONT_FAMILY_TITLE = '"League Spartan", system-ui, sans-serif';
 // Nunito Sans substitue "SN Pro" (indisponible sur Google Fonts) dans le rendu canvas.
 const FONT_FAMILY_BODY = '"Nunito Sans", system-ui, sans-serif';
 const FONT_FAMILY_ACCENT = '"Madimi One", system-ui, sans-serif';
 
-const COLOR_TITLE_OUTLINE = '#161616';
 const COLOR_DARK = '#323347';
 const COLOR_WHITE = '#ffffff';
 const COLOR_ACCENT = '#aaa8f8';
@@ -32,6 +30,11 @@ interface RenderConfig {
   titleSize: number;
   bodySize: number;
   accentSize: number;
+}
+
+export interface RenderOptions {
+  titleFont: string;
+  titleColor: string;
 }
 
 interface RenderResult {
@@ -60,6 +63,7 @@ export function renderSlide(
   template: TemplateId,
   dims: CanvasDimensions,
   bgImage: HTMLImageElement | null,
+  options: RenderOptions,
 ): RenderResult {
   const centered = template === 'minimal';
   const contentWidth = dims.width - dims.marginLeft - dims.marginRight;
@@ -82,6 +86,7 @@ export function renderSlide(
       contentHeight,
       centered,
       template,
+      options,
     );
 
     if (fitsIn(titleBlock, bodyBlock, accentBlock, layout, contentHeight)) {
@@ -103,10 +108,11 @@ export function renderSlide(
     contentHeight,
     centered,
     template,
+    options,
   );
 
   const contentX = dims.marginLeft;
-  drawTitle(ctx, slide.title, template, config.titleSize, contentX, dims.marginTop + layout.titleY, contentWidth, centered);
+  drawTitle(ctx, slide.title, template, config.titleSize, contentX, dims.marginTop + layout.titleY, contentWidth, centered, options);
   drawBody(ctx, slide.body, template, config.bodySize, contentX, dims.marginTop + layout.bodyY, contentWidth, centered);
   drawAccent(ctx, slide.accent, template, config.accentSize, contentX, dims.marginTop + layout.accentY, contentWidth, centered);
 
@@ -166,10 +172,11 @@ function measureLayout(
   contentHeight: number,
   centered: boolean,
   template: TemplateId,
+  options: RenderOptions,
 ) {
   const wrapWidths = getWrapWidths(template, contentWidth);
 
-  ctx.font = `800 ${config.titleSize}px ${FONT_FAMILY_TITLE}`;
+  ctx.font = `800 ${config.titleSize}px ${options.titleFont}`;
   const titleBlock = wrapText(ctx, slide.title, wrapWidths.title, config.titleSize * LINE_HEIGHT_TITLE);
 
   ctx.font = `700 ${config.bodySize}px ${FONT_FAMILY_BODY}`;
@@ -241,28 +248,29 @@ function drawTitle(
   y: number,
   maxWidth: number,
   centered: boolean,
+  options: RenderOptions,
 ) {
   if (!text) return;
-  ctx.font = `800 ${size}px ${FONT_FAMILY_TITLE}`;
+  ctx.font = `800 ${size}px ${options.titleFont}`;
   ctx.textBaseline = 'top';
   const block = wrapText(ctx, text, getWrapWidths(template, maxWidth).title, size * LINE_HEIGHT_TITLE);
 
   if (template === 'outline') {
-    drawStickerTitle(ctx, block, x, y, size, centered, maxWidth);
+    drawStickerTitle(ctx, block, x, y, size, centered, maxWidth, options.titleColor);
   } else if (template === 'underlay') {
-    drawUnderlayTitle(ctx, block, x, y, size, centered, maxWidth);
+    drawUnderlayTitle(ctx, block, x, y, size, centered, maxWidth, options.titleColor);
   } else if (template === 'collage') {
-    drawCollageTitle(ctx, block, x, y, size, centered, maxWidth);
+    drawCollageTitle(ctx, block, x, y, size, centered, maxWidth, options.titleColor);
   } else if (template === 'bulles') {
-    drawBullesTitle(ctx, block, x, y, size, centered, maxWidth);
+    drawBullesTitle(ctx, block, x, y, size, centered, maxWidth, options.titleColor);
   } else if (template === 'cartes') {
-    drawCartesTitle(ctx, block, x, y, size, centered, maxWidth);
+    drawCartesTitle(ctx, block, x, y, size, centered, maxWidth, options.titleColor);
   } else if (template === 'fiche') {
-    drawFicheTitle(ctx, block, x, y, size, centered, maxWidth);
+    drawFicheTitle(ctx, block, x, y, size, centered, maxWidth, options.titleColor);
   } else if (template === 'liste') {
-    drawListeTitle(ctx, block, x, y, size, centered, maxWidth);
+    drawListeTitle(ctx, block, x, y, size, centered, maxWidth, options.titleColor);
   } else {
-    drawMinimalTitle(ctx, block, x, y, size, centered, maxWidth);
+    drawMinimalTitle(ctx, block, x, y, size, centered, maxWidth, options.titleColor);
   }
 }
 
@@ -279,6 +287,7 @@ function drawStickerTitle(
   size: number,
   centered: boolean,
   maxWidth: number,
+  titleColor: string,
 ) {
   const lineHeight = size * LINE_HEIGHT_TITLE;
   const paddingX = STICKER_PADDING_X;
@@ -312,7 +321,7 @@ function drawStickerTitle(
   });
 
   // 2e passage : texte noir par-dessus
-  ctx.fillStyle = COLOR_TITLE_OUTLINE;
+  ctx.fillStyle = titleColor;
   block.lines.forEach((line, i) => {
     const lineY = y + i * lineHeight;
     let textX = x;
@@ -334,6 +343,7 @@ function drawUnderlayTitle(
   size: number,
   centered: boolean,
   maxWidth: number,
+  titleColor: string,
 ) {
   const lineHeight = size * LINE_HEIGHT_TITLE;
   const bandPaddingX = 28;
@@ -354,7 +364,7 @@ function drawUnderlayTitle(
     ctx.fillStyle = COLOR_ACCENT;
     ctx.fillRect(bandX, bandY, bandW, bandH);
 
-    ctx.fillStyle = COLOR_DARK;
+    ctx.fillStyle = titleColor;
     let textX = x;
     if (align === 'center') {
       textX = x + (maxWidth - line.width) / 2;
@@ -374,13 +384,14 @@ function drawMinimalTitle(
   size: number,
   centered: boolean,
   maxWidth: number,
+  titleColor: string,
 ) {
   const lineHeight = size * LINE_HEIGHT_TITLE;
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.6)';
   ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 2;
-  ctx.fillStyle = COLOR_WHITE;
+  ctx.fillStyle = titleColor;
 
   block.lines.forEach((line, i) => {
     const lineY = y + i * lineHeight;
@@ -563,6 +574,7 @@ function drawCollageTitle(
   size: number,
   centered: boolean,
   maxWidth: number,
+  titleColor: string,
 ) {
   const lineHeight = size * LINE_HEIGHT_TITLE;
   const paddingX = STICKER_PADDING_X;
@@ -595,7 +607,7 @@ function drawCollageTitle(
     ctx.restore();
   });
 
-  ctx.fillStyle = COLOR_TITLE_OUTLINE;
+  ctx.fillStyle = titleColor;
   block.lines.forEach((line, i) => {
     const lineY = y + i * lineHeight;
     let stickerX = x;
@@ -688,6 +700,7 @@ function drawBullesTitle(
   size: number,
   _centered: boolean,
   maxWidth: number,
+  titleColor: string,
 ) {
   const lineHeight = size * LINE_HEIGHT_TITLE;
   const paddingX = 36;
@@ -705,7 +718,7 @@ function drawBullesTitle(
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = COLOR_TITLE_OUTLINE;
+  ctx.fillStyle = titleColor;
   block.lines.forEach((line, i) => {
     ctx.fillText(line.text, x + paddingX, y + i * lineHeight);
   });
@@ -737,7 +750,7 @@ function drawBullesBody(
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = COLOR_TITLE_OUTLINE;
+  ctx.fillStyle = COLOR_DARK;
   block.lines.forEach((line, i) => {
     ctx.fillText(line.text, x + paddingX, y + i * size * LINE_HEIGHT_BODY);
   });
@@ -768,7 +781,7 @@ function drawBullesAccent(
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = COLOR_TITLE_OUTLINE;
+  ctx.fillStyle = COLOR_DARK;
   block.lines.forEach((line, i) => {
     ctx.fillText(line.text, x + paddingX, y + i * lineHeight);
   });
@@ -788,6 +801,7 @@ function drawCartesTitle(
   size: number,
   _centered: boolean,
   maxWidth: number,
+  titleColor: string,
 ) {
   const lineHeight = size * LINE_HEIGHT_TITLE;
   const paddingX = 28;
@@ -804,7 +818,7 @@ function drawCartesTitle(
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = COLOR_DARK;
+  ctx.fillStyle = titleColor;
   block.lines.forEach((line, i) => {
     ctx.fillText(line.text, x + paddingX, y + i * lineHeight);
   });
@@ -876,7 +890,7 @@ function drawCartesAccent(
   ctx.translate(cx, cy);
   ctx.rotate(angle);
   ctx.translate(-cx, -cy);
-  ctx.fillStyle = COLOR_TITLE_OUTLINE;
+  ctx.fillStyle = COLOR_ACCENT;
   block.lines.forEach((line, i) => {
     ctx.fillText(line.text, x + paddingX, y + i * lineHeight);
   });
@@ -897,6 +911,7 @@ function drawFicheTitle(
   size: number,
   _centered: boolean,
   maxWidth: number,
+  titleColor: string,
 ) {
   const paddingX = 28;
   const paddingY = 20;
@@ -917,7 +932,7 @@ function drawFicheTitle(
   roundRect(ctx, x, y - paddingY, 8, cardH, 4);
   ctx.fill();
 
-  ctx.fillStyle = COLOR_DARK;
+  ctx.fillStyle = titleColor;
   block.lines.forEach((line, i) => {
     ctx.fillText(line.text, x + paddingX + 8, y + i * lineHeight);
   });
@@ -999,6 +1014,7 @@ function drawListeTitle(
   size: number,
   _centered: boolean,
   maxWidth: number,
+  titleColor: string,
 ) {
   const paddingX = 28;
   const paddingY = 20;
@@ -1028,7 +1044,7 @@ function drawListeTitle(
     );
   });
 
-  ctx.fillStyle = COLOR_TITLE_OUTLINE;
+  ctx.fillStyle = titleColor;
   block.lines.forEach((line, i) => {
     ctx.fillText(line.text, x + paddingX, y + i * lineHeight);
   });
