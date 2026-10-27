@@ -26,6 +26,13 @@ const FONT_OPTIONS = [
   { value: '"League Spartan"', label: 'League Spartan' },
   { value: '"Nunito Sans"', label: 'Nunito Sans' },
   { value: '"Madimi One"', label: 'Madimi One' },
+  { value: '"Roboto Mono"', label: 'Roboto Mono' },
+  { value: 'Oregano', label: 'Oregano' },
+  { value: '"Crafty Girls"', label: 'Crafty Girls' },
+  { value: '"Covered By Your Grace"', label: 'Covered By Your Grace' },
+  { value: '"Roboto Serif"', label: 'Roboto Serif' },
+  { value: 'Bungee', label: 'Bungee' },
+  { value: '"Libre Franklin"', label: 'Libre Franklin' },
 ];
 const DEFAULT_TITLE_FONT = FONT_OPTIONS[0].value;
 const DEFAULT_TITLE_COLOR = '#161616';
